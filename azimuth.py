@@ -48,5 +48,3 @@ sc.pl.umap(adata, color='final_level_labels', title='Medium Annotations')
 sc.pl.umap(adata, color='final_level_confidence', title='Confidence score')
 
 
-
-

@@ -74,6 +74,81 @@ adata.obsp.keys() #Or specific ones:
 adata.obsp["distances"]
 
 
+#Check these annotations out:
+adata.obs["quadrato_final_clusters"]
+adata.obs["quadrato_final_clusters_score"]
+adata.obs["nano_Class"]
+adata.obs["nano_Class_score"]
+adata.obs["nano_State"]
+adata.obs["nano_State_score"]
+adata.obs["nano_Type_v1"]
+adata.obs["nano_Type_v1_score"]
+adata.obs["nano_Subtype_v1"]
+adata.obs["nano_Subtype_v1_score"]
+
+#And these:
+adata.obs["sepp_author_cell_type"]
+adata.obs["sepp_author_cell_type_score"]
+adata.obs["sepp_precisest_label"]
+adata.obs["sepp_precisest_label_score"]
+adata.obs["sepp_subtype"]
+adata.obs["sepp_subtype_score"]
+adata.obs["sepp_development_stage"]
+adata.obs["sepp_development_stage_score"]
+adata.obs["sepp_author_stage"]
+adata.obs["sepp_author_stage_score"]
+adata.obs["sepp_dev_state"]
+adata.obs["sepp_dev_state_score"]
+adata.obs["aldinger_fig_cell_type"]
+adata.obs["aldinger_fig_cell_type_score"]
+adata.obs["aldinger_figure_clusters"]
+adata.obs["aldinger_figure_clusters_score"]
+adata.obs["aldinger_age"]
+adata.obs["aldinger_age_score"]
+
+
+sc.pl.umap(
+    adata, 
+    color='aldinger_age_score',
+    legend_fontsize=14,       # bump this up (default is ~small)
+    legend_fontweight='bold',
+    legend_loc='right margin', # or 'on data' if you want labels on clusters
+    title='Aldinger Age Score'
+)
+
+
+
+#Do leiden clustering for manual annotation.
+#Do compositional analysis (stacked barplot) between 2 conditions after finalizing annotations.
+#Barplot example from previous workflow:
+# Visualize cell type amounts between patients
+
+# Count cell types per donor
+ct_counts = (
+    adata.obs
+    .groupby(["donor_id", "cell_type"])
+    .size()
+    .unstack(fill_value=0)
+)
+
+# Convert counts to proportions per donor
+ct_proportions = ct_counts.div(ct_counts.sum(axis=1), axis=0)
+
+# Plot stacked barplot of proportions
+ax = ct_proportions.plot(
+    kind="bar",
+    stacked=True,
+    figsize=(10, 6),
+    edgecolor="black"
+)
+
+plt.title("Cell type composition per donor")
+plt.ylabel("Proportion of cells")
+plt.xlabel("Donor ID")
+plt.ylim(0, 1)  # Proportions go from 0 to 1
+plt.legend(title="Cell type", bbox_to_anchor=(1.05, 1), loc="upper left")
+plt.tight_layout()
+plt.show()
 
 
 
@@ -84,3 +159,10 @@ adata.obsp["distances"]
 
 #DGE between disease and control
 #GO Enrichement analysis/ GSEA
+
+
+
+#Questions:
+#how many samples do I originally have in total, just 2? 
+#same culture conditions, just sifferent cell lines?/ how many organoids sequenced?
+#existing annotations?
