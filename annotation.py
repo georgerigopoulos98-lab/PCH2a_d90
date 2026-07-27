@@ -33,20 +33,23 @@ sc.pl.embedding(adata, basis=EMBEDDING_BASIS) #sc.pl. is scanpy plot, embedding 
 
 
 
+
+
 #AnnDara object metadata:
 
 #obs (observation (cell) annotations, holds per-cell metadata, like sample_id, batch, total_counts etc.):
 #'barcode', 'sample', 'sample_id', 'sequencing_id', 'experiment', 'experiment_lane_numbers', 'lane', 'lane_index', 'batch_lane', 'batch', 'batch_id', 'condition', 'cell_line', 'timepoint', 'protocol', 'analysis_group', 'organism_ontology_term_id', 'tissue_ontology_term_id', 'tissue_type', 'assay_ontology_term_id', 'development_stage_ontology_term_id', 'suspension_type', 'n_genes_by_counts', 'log1p_n_genes_by_counts', 'total_counts', 'log1p_total_counts', 'total_counts_mt', 'log1p_total_counts_mt', 'pct_counts_mt', 'total_counts_ribo', 'log1p_total_counts_ribo', 'pct_counts_ribo', 'outlier_mad', 'manual_outlier', 'doublet_score', 'predicted_doublet', 'doublet_status', 'Score_ER_stress', 'Score_Glycolysis', 'Score_HeatShock', 'Score_OxidativeStress', 'Score_Apoptosis', 'Score_Endoderm', 'Score_Mesoderm', 'Score_Neurogenesis', 'Score_Gliogenesis', 'Score_NSDevelopment', 'Score_ER_stress_robust_z', 'Score_Glycolysis_robust_z', 'Score_HeatShock_robust_z', 'Score_OxidativeStress_robust_z', 'Score_Apoptosis_robust_z', 'Score_Endoderm_robust_z', 'Score_Mesoderm_robust_z', 'lightweight_stress_score', 'off_target_score', 'stressed_cells', 'off_target_tissue', 'leiden_res0_25', 'leiden_res0_5', 'leiden_res1_0', 'leiden_res1_5', 'sepp_author_cell_type', 'sepp_author_cell_type_score', 'sepp_precisest_label', 'sepp_precisest_label_score', 'sepp_subtype', 'sepp_subtype_score', 'sepp_development_stage', 'sepp_development_stage_score', 'sepp_author_stage', 'sepp_author_stage_score', 'sepp_dev_state', 'sepp_dev_state_score', 'aldinger_fig_cell_type', 'aldinger_fig_cell_type_score', 'aldinger_figure_clusters', 'aldinger_figure_clusters_score', 'aldinger_age', 'aldinger_age_score', 'hnoca_level_1_pca', 'hnoca_level_1_pca_score', 'hnoca_level_2_pca', 'hnoca_level_2_pca_score', 'hnoca_level_3_pca', 'hnoca_level_3_pca_score', 'hnoca_level_4_pca', 'hnoca_level_4_pca_score', 'quadrato_final_clusters', 'quadrato_final_clusters_score', 'nano_Class', 'nano_Class_score', 'nano_State', 'nano_State_score', 'nano_Type_v1', 'nano_Type_v1_score', 'nano_Subtype_v1', 'nano_Subtype_v1_score', 'leiden_scVI_res0_25', 'leiden_scVI_res0_5', 'leiden_scVI_res0_75', 'leiden_scVI_res1_0', 'leiden_scVI_res1_5'
 adata.obs.head() #Or specific ones:
-adata.obs["tissue_type"]
+adata.obs["total_counts"]
 
+#Cell line: BIONi010-C HOM and WT
 #2 samples: S17818Nr5 and S17818Nr6.
-#2 conditions: CTRL and PCH. (all D90 and QB protocol)
+#2 conditions: CTRL and PCH. (all D90 and QB protocol (quadrato))
 
 #var (variable (gene) annotations, holds per-gene metadata, like gene_ids, highly_variable_rank, etc.):
 #'gene_ids', 'feature_types', 'genome', 'mt', 'ribo', 'n_cells_by_counts', 'mean_counts', 'log1p_mean_counts', 'pct_dropout_by_counts', 'total_counts', 'log1p_total_counts', 'n_cells', 'highly_variable', 'means', 'dispersions', 'dispersions_norm', 'highly_variable_nbatches', 'highly_variable_intersection', 'highly_variable_rank', 'variances', 'variances_norm', 'highly_variable_scvi_timepoint'
 adata.var.head() #Or specific ones:
-adata.var["mt"]
+adata.var["total_counts"]
 
 #uns (unstructured annotations, holds everything else that doesn't fit into obs or var, like sample_colors, batch_colors, etc.):
 #'aldinger_age_colors', 'aldinger_fig_cell_type_colors', 'aldinger_figure_clusters_colors', 'analysis_group_colors', 'assay_ontology_term_id_colors', 'batch_colors', 'batch_id_colors', 'batch_lane_colors', 'cell_line_colors', 'condition_colors', 'development_stage_ontology_term_id_colors', 'doublet_status_colors', 'experiment_colors', 'experiment_lane_numbers_colors', 'hnoca_level_1_pca_colors', 'hnoca_level_2_pca_colors', 'hnoca_level_3_pca_colors', 'hnoca_level_4_pca_colors', 'hvg', 'lane_colors', 'lane_index_colors', 'leiden_res0_25', 'leiden_res0_25_colors', 'leiden_res0_5', 'leiden_res0_5_colors', 'leiden_res1_0', 'leiden_res1_0_colors', 'leiden_res1_5', 'leiden_res1_5_colors', 'leiden_scVI_res0_25', 'leiden_scVI_res0_25_colors', 'leiden_scVI_res0_5', 'leiden_scVI_res0_5_colors', 'leiden_scVI_res0_75', 'leiden_scVI_res0_75_colors', 'leiden_scVI_res1_0', 'leiden_scVI_res1_0_colors', 'leiden_scVI_res1_5', 'leiden_scVI_res1_5_colors', 'log1p', 'manual_outlier_colors', 'nano_Class_colors', 'nano_State_colors', 'nano_Subtype_v1_colors', 'nano_Type_v1_colors', 'neighbors', 'neighbors_scVI', 'off_target_tissue_colors', 'organism_ontology_term_id_colors', 'outlier_mad_colors', 'pca', 'pca_scVI', 'predicted_doublet_colors', 'protocol_colors', 'quadrato_final_clusters_colors', 'sample_colors', 'sample_id_colors', 'scvi_timepoint_integration', 'sepp_author_cell_type_colors', 'sepp_author_stage_colors', 'sepp_dev_state_colors', 'sepp_development_stage_colors', 'sepp_precisest_label_colors', 'sepp_subtype_colors', 'sequencing_id_colors', 'stressed_cells_colors', 'suspension_type_colors', 'timepoint_colors', 'tissue_ontology_term_id_colors', 'tissue_type_colors', 'umap'
@@ -117,8 +120,273 @@ sc.pl.umap(
 )
 
 
+# Plot conditions:
+sc.pl.umap(
+    adata, 
+    color='condition',
+    size=20,
+    legend_fontsize=14,       # bump this up (default is ~small)
+    legend_fontweight='bold',
+    legend_loc='right margin', # or 'on data' if you want labels on clusters
+    title='Conditions'
+)
 
-#Do leiden clustering for manual annotation.
+#Plot conditions separately:
+
+conditions = adata.obs['condition'].unique()
+
+fig, axes = plt.subplots(
+    1,
+    len(conditions),
+    figsize=(7 * len(conditions), 6)
+)
+
+for ax, condition in zip(axes, conditions):
+    subset = adata[adata.obs['condition'] == condition].copy()
+
+    sc.pl.umap(
+        subset,
+        color='condition',
+        ax=ax,
+        size=20,
+        title=condition,
+        show=False,
+        legend_loc='none'
+    )
+
+    ax.set_title(
+        condition,
+        fontsize=20,
+        fontweight='bold'
+    )
+
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+
+#Clustering
+
+#Compare leiden resolutions:
+sc.pl.embedding(
+    adata,
+    basis="X_umap_scVI",
+    color=[
+        "leiden_scVI_res0_25",
+        "leiden_scVI_res0_5",
+        "leiden_scVI_res0_75",
+        "leiden_scVI_res1_0",
+        "leiden_scVI_res1_5"
+    ],
+    ncols=2,
+    legend_loc="on data",
+    frameon=False
+)
+
+#Use resolution 0.5 SCVI (n_neighbours 20 was used for these).
+
+#Use known cell type markers for manual annotation:
+
+sc.pl.umap(
+    adata,
+    color=[
+        "OLIG1",
+        "OLIG2"
+    ]
+)
+                                                                                   
+#Check highly expressed markers for each cluster:
+
+sc.tl.rank_genes_groups(
+    adata,
+    groupby="leiden_scVI_res0_5",
+    method="wilcoxon",
+    key_added="rank_genes_scVI_res0_5"
+)
+
+sc.pl.rank_genes_groups(
+    adata,
+    key="rank_genes_scVI_res0_5",
+    n_genes=10,
+    sharey=False
+)
+
+
+
+
+
+#Manual annotations:
+
+#0.5 Clusters:
+#0: Radial Glia (VIM) to Astrocytes from left to right (right side mature) (CLU)
+#1: Radial Glia (VIM) to Astrocytes from left to right (right side mature) (CLU)
+#2: Neurons
+#3: GABAergic (inhibitory) neurons (EBF3)
+#4: GABAergic interneurons (FOXP2) (NXPH2)
+#5: Purkinje cells (lower half) (SKOR2) (GRID2)
+#6: Oligodendrocyte precursor cells (OLIG1) (OLIG2) and top right specificcaly dividing! (TOP2A)
+#7: Cerebellar granule neurons (Glutamatergic) (FGF12)
+#8: Glutamatergic (excitatory) neurons bottom half (NEUROD6) (SLC17A6) AND Gabaergic (inhibitory) neurons top half (NR2F2) (SOX14)
+#9: GABAergic interneurons (FOXP2)
+#10:
+#11: 
+#12: GABAergic interneurons (CALB2) and Purkinje cells (upper half specifically) (SKOR2)
+#13:
+#14:
+#15: Serotonergic neurons (TPH2)
+#16: Fibroblasts (COL3A1)
+
+
+
+
+#All cluster right: radial glia / progenitors (SOX2)
+
+#All cluster left side: Neurons
+
+#Nano phases:
+#ALL the clusters on the right: Non-dividing
+#In between: Dividing
+#ALL in left: Post mitotic
+
+#All between 17-20PCW according to Aldinger and Sepp
+
+sc.pl.embedding(
+    adata,
+    basis="X_umap_scVI",
+    color=[
+        "leiden_scVI_res1_5"
+    ],
+    ncols=2,
+    legend_loc="on data",
+    frameon=False
+)
+
+#Name clusters manually (use 1.5 resolution for more specificity):
+
+#General annotations: eCN (excitatory cerebellar nuclei), iCN/PC (inhibitory cerebellar nuclei/ Purkinje cells), oligodendrocyte precursor cell (OPC) and Progenitor/ Astrocytes.
+
+#General clusters:
+cluster_to_celltype = {
+    '0': 'Progenitor/ Astrocytes',
+    '1': 'Progenitor/ Astrocytes',
+    '2': 'iCN/PC',
+    '3': 'OPC',
+    '4': 'iCN/PC',
+    '5': 'Progenitor/ Astrocytes',
+    '6': 'iCN/PC',
+    '7': 'Progenitor/ Astrocytes',
+    '8': 'iCN/PC',
+    '9': 'iCN/PC',
+    '10': 'iCN/PC',
+    '11': 'iCN/PC',
+    '12': 'eCN bottom half & iCN/PC top half',
+    '13': 'iCN/PC',
+    '14': 'iCN/PC',
+    '15': 'iCN/PC',
+    '16': 'Cerebellar granule neurons (Glutamatergic)',
+    '17': 'iCN/PC',
+    '18': 'iCN/PC',
+    '19': 'iCN/PC',
+    '20': 'iCN/PC',
+    '21': 'iCN/PC',
+    '22': 'OPC',
+    '23': 'iCN/PC',
+    '24': 'iCN/PC',
+    '25': 'iCN/PC',
+    '26': 'iCN/PC',
+    '27': 'Serotonergic neurons',
+    '28': 'Progenitor/ Astrocytes',
+    '29': 'Fibroblasts',
+    '30': 'iCN/PC'
+}
+
+#Add to metadata
+adata.obs['cell_type'] = (
+    adata.obs['leiden_scVI_res1_5']
+    .map(cluster_to_celltype)
+)
+
+#Specific subtypes:
+cluster_to_subtype = {
+    '0': 'Radial Glia (VIM) to Astrocytes (CLU) (left to right)',
+    '1': 'Radial Glia (VIM) to Astrocytes (CLU) (left to right)',
+    '2': 'GABAergic interneurons (FOXP2/NXPH2)',
+    '3': 'Oligodendrocyte precursor cells (OLIG1/OLIG2)',
+    '4': 'Purkinje cells (SKOR2/GRID2)',
+    '5': 'Radial Glia (VIM) to Astrocytes (CLU) (left to right)',
+    '6': 'GABAergic neurons (EBF3)',
+    '7': 'Radial Glia (VIM) to Astrocytes (CLU) (left to right)',
+    '8': 'iCN/PC (GAD1/GAD2)',
+    '9': 'iCN/PC (GAD1/GAD2)',
+    '10': 'iCN/PC (GAD1/GAD2)',
+    '11': 'GABAergic neurons (EBF3)',
+    '12': 'Glutamatergic neurons bottom half (NEUROD6/SLC17A6) /\nGABAergic neurons top half (NR2F2/SOX14)',
+    '13': 'iCN/PC (GAD1/GAD2)',
+    '14': 'iCN/PC (GAD1/GAD2)',
+    '15': 'iCN/PC (GAD1/GAD2)',
+    '16': 'Cerebellar granule neurons (Glutamatergic) (FGF12)',
+    '17': 'iCN/PC (GAD1/GAD2)',
+    '18': 'GABAergic interneurons (FOXP2/NXPH2)',
+    '19': 'GABAergic interneurons (FOXP2)',
+    '20': 'iCN/PC (GAD1/GAD2)',
+    '21': 'iCN/PC (GAD1/GAD2)',
+    '22': 'Oligodendrocyte precursor cells - divinding (TOP2A)',
+    '23': 'GABAergic interneurons (CALB2)',
+    '24': 'iCN/PC (GAD1/GAD2)',
+    '25': 'iCN/PC (GAD1/GAD2)',
+    '26': 'Purkinje cells (SKOR2)',
+    '27': 'Serotonergic neurons (TPH2)',
+    '28': 'Radial Glia (VIM) to Astrocytes (CLU) (left to right)',
+    '29': 'Fibroblasts (COL3A1)',
+    '30': 'iCN/PC (GAD1/GAD2)'
+}
+
+#Add to metadata
+adata.obs['cell_subtype'] = (
+    adata.obs['leiden_scVI_res1_5']
+    .map(cluster_to_subtype)
+)
+
+#Visualize final annotations
+sc.pl.umap(
+    adata,
+    color='cell_subtype',
+    legend_fontsize=14,
+    legend_fontweight='bold',
+    legend_loc='right margin',
+    size=20,
+    title='Subtypes'
+)
+
+sc.pl.umap(
+    adata,
+    color='cell_type',
+    legend_fontsize=14,
+    legend_fontweight='bold',
+    legend_loc='right margin',
+    size=20,
+    title='General annotations'
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#TO-DO:
+
 #Do compositional analysis (stacked barplot) between 2 conditions after finalizing annotations.
 #Barplot example from previous workflow:
 # Visualize cell type amounts between patients
@@ -152,17 +420,6 @@ plt.show()
 
 
 
-#Background:
-#Cell types are further divided in cell states (subtypes).
-#Manual annotation or via DGE
-#Automated annotation 
-
-#DGE between disease and control
-#GO Enrichement analysis/ GSEA
 
 
 
-#Questions:
-#how many samples do I originally have in total, just 2? 
-#same culture conditions, just sifferent cell lines?/ how many organoids sequenced?
-#existing annotations?
