@@ -2,7 +2,6 @@
 import scanpy as sc
 import anndata as ad
 import matplotlib.pyplot as plt
-import harmonypy as hm
 import pandas as pd
 import numpy as np
 
@@ -193,8 +192,10 @@ sc.pl.embedding(
 sc.pl.umap(
     adata,
     color=[
-        "OLIG1",
-        "OLIG2"
+        "PAX6",
+        "NFIA",
+        "NFIB",
+        "FOXG1"
     ]
 )
                                                                                    
@@ -282,17 +283,17 @@ cluster_to_celltype = {
     '9': 'iCN/PC',
     '10': 'iCN/PC',
     '11': 'iCN/PC',
-    '12': 'eCN bottom half & iCN/PC top half',
+    '12': 'iCN/PC',
     '13': 'iCN/PC',
     '14': 'iCN/PC',
     '15': 'iCN/PC',
-    '16': 'Cerebellar granule neurons (Glutamatergic)',
+    '16': 'iCN/PC',
     '17': 'iCN/PC',
     '18': 'iCN/PC',
     '19': 'iCN/PC',
     '20': 'iCN/PC',
     '21': 'iCN/PC',
-    '22': 'OPC',
+    '22': 'OPC - dividing',
     '23': 'iCN/PC',
     '24': 'iCN/PC',
     '25': 'iCN/PC',
@@ -317,18 +318,18 @@ cluster_to_subtype = {
     '3': 'Oligodendrocyte precursor cells (OLIG1/OLIG2)',
     '4': 'Purkinje cells (SKOR2/GRID2)',
     '5': 'Radial Glia (VIM) to Astrocytes (CLU) (left to right)',
-    '6': 'GABAergic neurons (EBF3)',
+    '6': 'Ventricular zone (VZ) neuroblasts (NFIA/NFIB)',
     '7': 'Radial Glia (VIM) to Astrocytes (CLU) (left to right)',
     '8': 'iCN/PC (GAD1/GAD2)',
     '9': 'iCN/PC (GAD1/GAD2)',
     '10': 'iCN/PC (GAD1/GAD2)',
-    '11': 'GABAergic neurons (EBF3)',
+    '11': 'Ventricular zone (VZ) neuroblasts (NFIA/NFIB)',
     '12': 'Glutamatergic neurons bottom half (NEUROD6/SLC17A6) /\nGABAergic neurons top half (NR2F2/SOX14)',
     '13': 'iCN/PC (GAD1/GAD2)',
     '14': 'iCN/PC (GAD1/GAD2)',
     '15': 'iCN/PC (GAD1/GAD2)',
-    '16': 'Cerebellar granule neurons (Glutamatergic) (FGF12)',
-    '17': 'iCN/PC (GAD1/GAD2)',
+    '16': 'Ventricular zone (VZ) neuroblasts (NFIA/NFIB)',
+    '17': 'Ventricular zone (VZ) neuroblasts (NFIA/NFIB)',
     '18': 'GABAergic interneurons (FOXP2/NXPH2)',
     '19': 'GABAergic interneurons (FOXP2)',
     '20': 'iCN/PC (GAD1/GAD2)',
@@ -372,29 +373,33 @@ sc.pl.umap(
 )
 
 
+#Cluster 16 I previously annotated as: Cerebellar granule neurons (Glutamatergic) (FGF12) OR off-target forebrain FOXG1(?).
+#Also clusters 6 and 11 as: GABAergic neurons (EBF3)
 
 
+#Check amount of cells in each annotated cluster:
+
+adata.obs["cell_type"].value_counts()
+adata.obs["cell_subtype"].value_counts()
+
+#And between each condition:
+
+pd.crosstab(
+    adata.obs["cell_type"],
+    adata.obs["condition"]
+)
+
+pd.crosstab(
+    adata.obs["cell_subtype"],
+    adata.obs["condition"]
+)
 
 
-
-
-
-
-
-
-
-
-
-#TO-DO:
-
-#Do compositional analysis (stacked barplot) between 2 conditions after finalizing annotations.
-#Barplot example from previous workflow:
-# Visualize cell type amounts between patients
-
+#Compositional analysis (stacked barplot) between 2 conditions:
 # Count cell types per donor
 ct_counts = (
     adata.obs
-    .groupby(["donor_id", "cell_type"])
+    .groupby(["condition", "cell_type"])
     .size()
     .unstack(fill_value=0)
 )
@@ -410,14 +415,43 @@ ax = ct_proportions.plot(
     edgecolor="black"
 )
 
-plt.title("Cell type composition per donor")
+plt.title("Cell type composition")
 plt.ylabel("Proportion of cells")
-plt.xlabel("Donor ID")
+plt.xlabel("Condition")
 plt.ylim(0, 1)  # Proportions go from 0 to 1
-plt.legend(title="Cell type", bbox_to_anchor=(1.05, 1), loc="upper left")
+plt.legend(fontsize=14, title_fontsize=14, title="Cell type", bbox_to_anchor=(1.05, 1), loc="upper left")
 plt.tight_layout()
 plt.show()
 
+
+#Same for subtypes:
+ct_counts = (
+    adata.obs
+    .groupby(["condition", "cell_subtype"])
+    .size()
+    .unstack(fill_value=0)
+)
+
+ct_proportions = ct_counts.div(ct_counts.sum(axis=1), axis=0)
+
+ax = ct_proportions.plot(
+    kind="bar",
+    stacked=True,
+    figsize=(10, 6),
+    edgecolor="black"
+)
+
+plt.title("Cell subtype composition")
+plt.ylabel("Proportion of cells")
+plt.xlabel("Condition")
+plt.ylim(0, 1)  # Proportions go from 0 to 1
+plt.legend(fontsize=12, title_fontsize=12, title="Cell subtype", bbox_to_anchor=(1.05, 1), loc="upper left")
+plt.tight_layout()
+plt.show()
+
+
+#Save annotated dataset and do pseudobulk DGE in R:
+adata.write("data/processed_data/PCH2a_d90_annotated.h5ad")
 
 
 

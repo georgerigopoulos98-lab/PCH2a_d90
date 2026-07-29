@@ -4,28 +4,34 @@
 import memento
 from statsmodels.stats.multitest import multipletests
 
+#Import annotated dataset:
+adata = sc.read_h5ad("data/processed_data/PCH2a_d90_annotated.h5ad")
+adata
+
 #Check my Anndata:
 adata.obs["sample"] # S17818Nr6 (CTRL) vs S17818Nr5 (PCH)
 adata.obs["condition"] # CTRL vs PCH
 adata.layers["counts"] # raw counts in layers
-adata.obs["azimuth_broad"] # Cell annotations
+adata.obs["cell_type"] # Cell annotations
 
 # Restore raw counts
 adata.X = adata.layers["counts"].copy()
 
 # Parameters
 condition_col = "condition"
-celltype_col = "azimuth_broad"
+celltype_col = "cell_type"
 
 control = "CTRL"
 case = "PCH"
 
-capture_rate = 0.15      # 10x v2
+# Memento capture/detection parameter q
+# Currently set to 0.15 based on the initial analysis setup:
+capture_rate = 0.15
 num_boot = 5000
 num_cpus = 8
 
 # DEG thresholds
-logfc_thresh = 1.0     # 2-fold change
+lnfc_thresh = np.log(2)   # 2-fold change on natural-log scale
 fdr_thresh = 0.05
 
 # Differential expression
@@ -47,6 +53,8 @@ for ct in celltypes:
         continue
 
     # Encode condition
+    # CTRL = 0
+    # PCH = 1
     subset.obs["stim"] = (
         subset.obs[condition_col] == case
     ).astype(int)
@@ -57,6 +65,9 @@ for ct in celltypes:
         continue
 
     # Run Memento
+    # This tests BOTH:
+    # 1. Differential mean expression
+    # 2. Differential variability
     res = memento.binary_test_1d(
         adata=subset,
         treatment_col="stim",
@@ -65,59 +76,130 @@ for ct in celltypes:
         num_cpus=num_cpus
     )
 
+    # Convert Memento natural-log coefficients
+
+    # Mean expression:
+    # de_coef is on the natural-log fold-change scale
+    res["mean_fold_change"] = np.exp(res["de_coef"])
+
+    # Convert to log2 fold change
+    res["log2FC"] = (
+        res["de_coef"] / np.log(2)
+    )
+
+    # Variability:
+    # dv_coef is on the natural-log variance fold-change scale
+    res["variance_fold_change"] = np.exp(res["dv_coef"])
+
+    # Convert to log2 variance fold change
+    res["log2_variance_FC"] = (
+        res["dv_coef"] / np.log(2)
+    )
+
     # Multiple testing correction
-    res["FDR"] = multipletests(
+
+    # Mean expression FDR
+    res["DE_FDR"] = multipletests(
         res["de_pval"],
         method="fdr_bh"
     )[1]
 
+    # Variability FDR
+    res["DV_FDR"] = multipletests(
+            res["dv_pval"],
+            method="fdr_bh"
+        )[1]
+
     res["celltype"] = ct
 
-    # Apply DEG thresholds
+    # --------------------------------------------------
+    # Significant differential mean expression
+    # --------------------------------------------------
 
-    res["significant"] = (
-        (res["FDR"] < fdr_thresh) &
-        (abs(res["de_coef"]) > logfc_thresh)
+    res["DE_significant"] = (
+        (res["DE_FDR"] < fdr_thresh) &
+        (abs(res["de_coef"]) >= lnfc_thresh)
     )
 
+    # --------------------------------------------------
+    # Significant differential variability
+    # --------------------------------------------------
 
-    res["direction"] = "Not significant"
+    res["DV_significant"] = (
+        (res["DV_FDR"] < fdr_thresh) &
+        (abs(res["dv_coef"]) > lnfc_thresh)
+    )
+
+    # --------------------------------------------------
+    # Classify genes based on mean and variability
+    # --------------------------------------------------
+
+    res["pattern"] = "Neither"
 
     res.loc[
-        (res["significant"]) &
-        (res["de_coef"] > logfc_thresh),
-        "direction"
+        (res["DE_significant"]) &
+        (~res["DV_significant"]),
+        "pattern"
+    ] = "Mean only"
+
+    res.loc[
+        (~res["DE_significant"]) &
+        (res["DV_significant"]),
+        "pattern"
+    ] = "Variability only"
+
+    res.loc[
+        (res["DE_significant"]) &
+        (res["DV_significant"]),
+        "pattern"
+    ] = "Mean + variability"
+
+    res["DE_direction"] = "Not significant"
+
+    res.loc[
+        (res["DE_significant"]) &
+        (res["de_coef"] > lnfc_thresh),
+        "DE_direction"
     ] = "PCH up"
 
-
     res.loc[
-        (res["significant"]) &
-        (res["de_coef"] < -logfc_thresh),
-        "direction"
+        (res["DE_significant"]) &
+        (res["de_coef"] < -lnfc_thresh),
+        "DE_direction"
     ] = "CTRL up"
 
-    # Volcano colors
-
-    res["color"] = "gray"
+    res["DV_direction"] = "Not significant"
 
     res.loc[
-        res["direction"] == "PCH up",
-        "color"
-    ] = "red"
+        (res["DV_significant"]) &
+        (res["dv_coef"] > lnfc_thresh),
+        "DV_direction"
+    ] = "More variable in PCH"
 
     res.loc[
-        res["direction"] == "CTRL up",
-        "color"
-    ] = "blue"
+        (res["DV_significant"]) &
+        (res["dv_coef"] < -lnfc_thresh),
+        "DV_direction"
+    ] = "More variable in CTRL"
 
-    # Save
-    outfile = (
-        f"memento_{ct.replace(' ','_')}_DE.csv"
+
+    # Store results
+    results_all[ct] = res
+
+    # Print summary
+    print(
+        f"  Significant mean-expression genes: "
+        f"{res['DE_significant'].sum()}"
     )
 
-    res.to_csv(outfile, index=False)
+    print(
+        f"  Significant variability genes: "
+        f"{res['DV_significant'].sum()}"
+    )
 
-    results_all[ct] = res
+    print(
+        res["pattern"].value_counts()
+    )
 
 print("Done.")
 
@@ -127,48 +209,88 @@ combined = pd.concat(
     ignore_index=True
 )
 
-combined.to_csv(
-    "Memento_All_Celltypes.csv",
-    index=False
-)
 
-#Significant genes:
-sig = combined[
-    combined["significant"]
+#Significant mean-expression genes
+sig_DE = combined[
+    combined["DE_significant"]
 ].sort_values(
-    ["celltype","FDR"]
-)
-
-sig.to_csv(
-    "Memento_significant_DEGs.csv",
-    index=False
+    ["celltype","DE_FDR"]
 )
 
 
 print(
-    f"Total significant DEGs: {sig.shape[0]}"
+    f"Total significant differential mean genes: "
+    f"{sig_DE.shape[0]}"
 )
+
+#Significant variability genes
+sig_DV = combined[
+    combined["DV_significant"]
+].sort_values(
+    ["celltype", "DV_FDR"]
+)
+
+print(
+    f"Total significant differential variability genes: "
+    f"{sig_DV.shape[0]}"
+)
+
+# Save results
+
+combined.to_csv(
+    "Memento_all_results.csv",
+    index=False
+)
+
+sig_DE.to_csv(
+    "Memento_significant_mean_genes.csv",
+    index=False
+)
+
+sig_DV.to_csv(
+    "Memento_significant_variability_genes.csv",
+    index=False
+)
+
+
+
 
 #Visualize results
 # >0 means gene is upregulated in PCH relative to CTRL
 # <0 means gene is downregulated in PCH
-#Volcano plot:
-#Label top genes:
+
+
+# ==========================================================
+# MEAN EXPRESSION VOLCANO PLOTS
+# ==========================================================
+
 for ct, res in results_all.items():
 
-    plt.figure(figsize=(8,6))
+    plt.figure(figsize=(8, 6))
 
-
+    # Plot all genes
     plt.scatter(
-        res["de_coef"],
-        -np.log10(res["FDR"] + 1e-300),
-        c=res["color"],
+        res["log2FC"],
+        -np.log10(res["DE_FDR"] + 1e-300),
         alpha=0.5
     )
 
+    # 2-fold effect-size thresholds
+    plt.axvline(
+        1,
+        linestyle="--",
+        color="black",
+        linewidth=1
+    )
 
-    # Threshold lines
+    plt.axvline(
+        -1,
+        linestyle="--",
+        color="black",
+        linewidth=1
+    )
 
+    # FDR threshold
     plt.axhline(
         -np.log10(fdr_thresh),
         linestyle="--",
@@ -176,44 +298,26 @@ for ct, res in results_all.items():
         linewidth=1
     )
 
-    plt.axvline(
-        logfc_thresh,
-        linestyle="--",
-        color="black",
-        linewidth=1
-    )
-
-    plt.axvline(
-        -logfc_thresh,
-        linestyle="--",
-        color="black",
-        linewidth=1
-    )
-
-
-    # Label top genes
-
+    # Label significant genes
     top = (
         res[
-            res["significant"]
+            res["DE_significant"]
         ]
-        .sort_values("FDR")
+        .sort_values("DE_FDR")
         .head(15)
     )
-
 
     for _, row in top.iterrows():
 
         plt.text(
-            row["de_coef"],
-            -np.log10(row["FDR"] + 1e-300),
+            row["log2FC"],
+            -np.log10(row["DE_FDR"] + 1e-300),
             row["gene"],
             fontsize=8
         )
 
-
     plt.xlabel(
-        "Log2 fold change (PCH vs CTRL)"
+        "log2 fold change (PCH vs CTRL)"
     )
 
     plt.ylabel(
@@ -221,57 +325,589 @@ for ct, res in results_all.items():
     )
 
     plt.title(
-        f"Memento DE: {ct} (PCH vs CTRL)"
+        f"Memento differential mean expression: {ct}"
     )
-
 
     plt.tight_layout()
 
     plt.savefig(
-        f"Volcano_Memento_{ct.replace(' ','_')}.png",
+        f"Volcano_Memento_Mean_{ct.replace(' ', '_').replace('/', '_')}.png",
         dpi=300
     )
 
     plt.show()
 
 
-#Top DE genes barplots:
+# ==========================================================
+# DIFFERENTIAL VARIABILITY VOLCANO PLOTS
+# ==========================================================
+
+for ct, res in results_all.items():
+
+    plt.figure(figsize=(8, 6))
+
+    # Plot all genes
+    plt.scatter(
+        res["log2_variance_FC"],
+        -np.log10(res["DV_FDR"] + 1e-300),
+        alpha=0.5
+    )
+
+    # 2-fold variance effect-size thresholds
+    plt.axvline(
+        1,
+        linestyle="--",
+        color="black",
+        linewidth=1
+    )
+
+    plt.axvline(
+        -1,
+        linestyle="--",
+        color="black",
+        linewidth=1
+    )
+
+    # FDR threshold
+    plt.axhline(
+        -np.log10(fdr_thresh),
+        linestyle="--",
+        color="black",
+        linewidth=1
+    )
+
+    # Label significant genes
+    top = (
+        res[
+            res["DV_significant"]
+        ]
+        .sort_values("DV_FDR")
+        .head(15)
+    )
+
+    for _, row in top.iterrows():
+
+        plt.text(
+            row["log2_variance_FC"],
+            -np.log10(row["DV_FDR"] + 1e-300),
+            row["gene"],
+            fontsize=8
+        )
+
+    plt.xlabel(
+        "log2 variance fold change (PCH vs CTRL)"
+    )
+
+    plt.ylabel(
+        "-log10(FDR)"
+    )
+
+    plt.title(
+        f"Memento differential variability: {ct}"
+    )
+
+    plt.tight_layout()
+
+    plt.savefig(
+        f"Volcano_Memento_Variability_{ct.replace(' ', '_').replace('/', '_')}.png",
+        dpi=300
+    )
+
+    plt.show()
+
+
+# ==========================================================
+# TOP DIFFERENTIAL MEAN GENES
+# ==========================================================
+
 for ct, res in results_all.items():
 
     top = (
         res[
-            res["significant"]
+            res["DE_significant"]
         ]
-        .sort_values("FDR")
+        .sort_values("DE_FDR")
         .head(20)
-        .sort_values("de_coef")
+        .sort_values("log2FC")
     )
-
 
     if top.empty:
         continue
 
-
-    plt.figure(figsize=(8,6))
-
+    plt.figure(figsize=(8, 6))
 
     plt.barh(
         top["gene"],
-        top["de_coef"]
+        top["log2FC"]
     )
 
-
     plt.xlabel(
-        "Log2 fold change (PCH vs CTRL)"
+        "log2 fold change (PCH vs CTRL)"
     )
 
     plt.title(
-        f"Top Memento DE genes: {ct}"
+        f"Top Memento differential mean genes: {ct}"
     )
 
     plt.tight_layout()
 
     plt.show()
+
+
+# ==========================================================
+# TOP DIFFERENTIAL VARIABILITY GENES
+# ==========================================================
+
+for ct, res in results_all.items():
+
+    top = (
+        res[
+            res["DV_significant"]
+        ]
+        .sort_values("DV_FDR")
+        .head(20)
+        .sort_values("log2_variance_FC")
+    )
+
+    if top.empty:
+        continue
+
+    plt.figure(figsize=(8, 6))
+
+    plt.barh(
+        top["gene"],
+        top["log2_variance_FC"]
+    )
+
+    plt.xlabel(
+        "log2 variance fold change (PCH vs CTRL)"
+    )
+
+    plt.title(
+        f"Top Memento differential variability genes: {ct}"
+    )
+
+    plt.tight_layout()
+
+    plt.show()
+
+
+
+
+
+
+
+
+
+
+# ==========================================================
+# DIFFERENTIAL GENE-GENE CORRELATION / COEXPRESSION
+# ==========================================================
+
+from itertools import combinations
+from statsmodels.stats.multitest import multipletests
+
+corr_num_boot = 1000
+
+results_corr = {}
+
+for ct in celltypes:
+
+    print("\n===================================================")
+    print(f"Running differential correlation for {ct}")
+
+    subset = adata[
+        adata.obs[celltype_col] == ct
+    ].copy()
+
+    print(f"Cells: {subset.n_obs}")
+
+    # Skip tiny populations
+    if subset.n_obs < 100:
+        print("Skipping (<100 cells)")
+        continue
+
+    # Encode condition
+    subset.obs["stim"] = (
+        subset.obs[condition_col] == case
+    ).astype(int)
+
+    # Need both conditions
+    if subset.obs["stim"].nunique() != 2:
+        print("Skipping (only one condition present)")
+        continue
+
+    # --------------------------------------------
+    # Candidate genes FOR THIS CELL TYPE ONLY
+    # --------------------------------------------
+
+    de = results_all[ct]
+
+    # Top differential mean-expression genes
+    top_de = (
+        de[
+            de["DE_significant"]
+        ]
+        .sort_values("DE_FDR")
+        .head(50)
+    )
+
+    # Top differential variability genes
+    top_dv = (
+        de[
+            de["DV_significant"]
+        ]
+        .sort_values("DV_FDR")
+        .head(50)
+    )
+
+    # Union of both sets
+    candidate_genes = sorted(
+        set(top_de["gene"]).union(
+            top_dv["gene"]
+        )
+    )
+
+    print(
+        f"Candidate genes: {len(candidate_genes)}"
+    )
+
+    print(
+        "Top DE genes:",
+        top_de["gene"].tolist()[:10]
+    )
+
+    print(
+        "Top DV genes:",
+        top_dv["gene"].tolist()[:10]
+    )
+
+    # Need at least two genes
+    if len(candidate_genes) < 2:
+        print("Skipping (not enough candidate genes)")
+        continue
+
+    # --------------------------------------------
+    # Create gene pairs
+    # --------------------------------------------
+
+    gene_pairs = list(
+        combinations(
+            candidate_genes,
+            2
+        )
+    )
+
+    print(
+        f"{ct}: {len(candidate_genes)} genes -> {len(gene_pairs)} gene pairs"
+    )
+
+    # --------------------------------------------
+    # Run Memento
+    # --------------------------------------------
+
+    try:
+
+        corr_res = memento.binary_test_2d(
+            adata=subset,
+            gene_pairs=gene_pairs,
+            capture_rate=capture_rate,
+            treatment_col="stim",
+            num_boot=corr_num_boot,
+            num_cpus=num_cpus
+        )
+
+    except Exception as e:
+
+        print(f"Failed: {e}")
+        continue
+
+    print(
+        f"Memento returned {len(corr_res)} tests"
+    )
+
+    if corr_res.empty:
+
+        print("No valid gene pairs returned.")
+        continue
+
+    # --------------------------------------------
+    # Multiple testing correction
+    # --------------------------------------------
+
+    corr_res["FDR"] = multipletests(
+        corr_res["corr_pval"],
+        method="fdr_bh"
+    )[1]
+
+    corr_res["celltype"] = ct
+
+    # Standardized effect
+    corr_res["z"] = np.where(
+        corr_res["corr_se"] > 0,
+        corr_res["corr_coef"] / corr_res["corr_se"],
+        np.nan
+    )
+
+    # Significant differential correlation
+    corr_res["significant"] = (
+        (corr_res["FDR"] < fdr_thresh) &
+        (corr_res["corr_se"] < 0.20)
+    )
+
+    results_corr[ct] = corr_res
+
+    print(
+        f"Significant differential correlations: "
+        f"{corr_res['significant'].sum()}"
+    )
+
+print("\nDifferential correlation analysis finished.")
+
+# ==========================================================
+# Combine results
+# ==========================================================
+
+if len(results_corr) == 0:
+
+    print("No correlation results were generated.")
+
+else:
+
+    combined_corr = pd.concat(
+        results_corr.values(),
+        ignore_index=True
+    )
+
+    sig_corr = combined_corr[
+        combined_corr["significant"]
+    ].sort_values(
+        ["celltype", "FDR"]
+    )
+
+    combined_corr.to_csv(
+        "Memento_all_differential_correlation_results.csv",
+        index=False
+    )
+
+    sig_corr.to_csv(
+        "Memento_significant_differential_correlations.csv",
+        index=False
+    )
+
+    print()
+    print(
+        f"Total tests: {combined_corr.shape[0]}"
+    )
+
+    print(
+        f"Significant correlations: {sig_corr.shape[0]}"
+    )
+
+    print(sig_corr.head(20))
+
+
+#Visualize correlation:
+
+#Volcano plots:
+for ct, res in results_corr.items():
+
+    plt.figure(figsize=(8,6))
+
+    plt.scatter(
+        res["corr_coef"],
+        -np.log10(res["FDR"] + 1e-300),
+        alpha=0.5
+    )
+
+    plt.axhline(
+        -np.log10(fdr_thresh),
+        color="black",
+        linestyle="--"
+    )
+
+    top = (
+        res[res["significant"]]
+        .sort_values("FDR")
+        .head(15)
+    )
+
+    for _, row in top.iterrows():
+
+        plt.text(
+            row["corr_coef"],
+            -np.log10(row["FDR"] + 1e-300),
+            f"{row['gene_1']}\n{row['gene_2']}",
+            fontsize=7
+        )
+
+    plt.xlabel("Differential correlation coefficient")
+    plt.ylabel("-log10(FDR)")
+    plt.title(f"Differential correlation: {ct}")
+
+    plt.tight_layout()
+    plt.show()
+
+
+
+
+
+#Heatmap:
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# ==========================================================
+# DIFFERENTIAL CORRELATION HEATMAPS
+# ==========================================================
+
+for ct in sorted(combined_corr["celltype"].unique()):
+
+    print(f"Plotting {ct}")
+
+    df = combined_corr[
+        combined_corr["celltype"] == ct
+    ].copy()
+
+    # ----------------------------------------
+    # Use significant pairs if available
+    # ----------------------------------------
+
+    plot_df = df[df["significant"]].copy()
+
+    if plot_df.empty:
+
+        print(
+            "  No significant pairs; plotting top 50 by FDR."
+        )
+
+        plot_df = (
+            df.sort_values("FDR")
+              .head(50)
+        )
+
+    # ----------------------------------------
+    # Get genes
+    # ----------------------------------------
+
+    genes = sorted(
+        set(plot_df["gene_1"]).union(
+            plot_df["gene_2"]
+        )
+    )
+
+    n = len(genes)
+
+    if n < 2:
+        print("  Not enough genes.")
+        continue
+
+    gene_to_idx = {
+        g: i for i, g in enumerate(genes)
+    }
+
+    # ----------------------------------------
+    # Build matrix
+    # ----------------------------------------
+
+    mat = np.full((n, n), np.nan)
+
+    np.fill_diagonal(mat, 0)
+
+    for _, row in plot_df.iterrows():
+
+        i = gene_to_idx[row["gene_1"]]
+        j = gene_to_idx[row["gene_2"]]
+
+        mat[i, j] = row["corr_coef"]
+        mat[j, i] = row["corr_coef"]
+
+    # ----------------------------------------
+    # Plot
+    # ----------------------------------------
+
+    plt.figure(figsize=(10, 8))
+
+    im = plt.imshow(
+        mat,
+        cmap="coolwarm",
+    )
+
+    plt.xticks(
+        range(n),
+        genes,
+        rotation=90,
+        fontsize=8
+    )
+
+    plt.yticks(
+        range(n),
+        genes,
+        fontsize=8
+    )
+
+    plt.title(
+        f"Differential gene-gene correlation\n{ct}"
+    )
+
+    plt.colorbar(
+        im,
+        label="Correlation coefficient change"
+    )
+
+    # Annotate values if matrix is small
+    if n <= 20:
+
+        for i in range(n):
+            for j in range(n):
+
+                if np.isnan(mat[i, j]):
+                    continue
+
+                plt.text(
+                    j,
+                    i,
+                    f"{mat[i, j]:.2f}",
+                    ha="center",
+                    va="center",
+                    fontsize=6
+                )
+
+    plt.tight_layout()
+
+    filename = (
+        "Correlation_Heatmap_"
+        + ct.replace("/", "_")
+             .replace(" ", "_")
+        + ".png"
+    )
+
+    plt.savefig(
+        filename,
+        dpi=300,
+        bbox_inches="tight"
+    )
+
+    plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -363,7 +999,7 @@ plt.show()
 #Individual volcano plots per cell type:
 # Parameters
 condition_col = "condition"
-celltype_col = "azimuth_broad"
+celltype_col = "cell_type"
 
 control = "CTRL"
 case = "PCH"
@@ -499,15 +1135,6 @@ for ct in celltypes:
 
 
 
-    # Save individual results
-
-    de_results.to_csv(
-        f"Scanpy_DE_{ct.replace(' ','_')}.csv",
-        index=False
-    )
-
-
-
     # ============================
     # Volcano plot
     # ============================
@@ -619,12 +1246,6 @@ for ct in celltypes:
 
 
     plt.tight_layout()
-
-
-    plt.savefig(
-        f"Volcano_Scanpy_{ct.replace(' ','_')}.png",
-        dpi=300
-    )
 
 
     plt.show()
