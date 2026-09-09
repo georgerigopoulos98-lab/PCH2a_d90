@@ -6,10 +6,9 @@ import pandas as pd
 import numpy as np
 
 # Data retrieval
-adata = sc.read_h5ad(r"\\172.23.94.116\AG Mayer$\Students\George\PCH2a_d90\data\raw_data\integrated_data_scvi_d90.h5ad")
+adata = sc.read_h5ad(#Path here)
 adata
 
-#Lizia script:
 #scVI (single-cell Variation Interference):
 def activate_scvi_embeddings(adata):
     if "X_umap_scVI" not in adata.obsm:
@@ -452,8 +451,6 @@ plt.show()
 
 #Save annotated dataset and do pseudobulk DGE in R:
 adata.write("data/processed_data/PCH2a_d90_annotated.h5ad")
-
-
 
 
 

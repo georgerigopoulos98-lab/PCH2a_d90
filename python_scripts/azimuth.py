@@ -5,7 +5,7 @@ import panhumanpy as ph
 import anndata as ad
 import scanpy as sc
 
-# Load my data from annotations.py
+# Load data from annotations.py
 
 # Create Azimuth object
 azimuth = ph.AzimuthNN(adata)
